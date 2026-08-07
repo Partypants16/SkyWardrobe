@@ -1,0 +1,18 @@
+# Node
+node_modules/
+npm-debug.log
+package-lock.json
+
+# Capacitor Android
+SkyWardrobe-Android/node_modules/
+SkyWardrobe-Android/android/.gradle/
+SkyWardrobe-Android/android/build/
+SkyWardrobe-Android/android/app/build/
+SkyWardrobe-Android/android/capacitor-cordova-android-plugins/build/
+
+# Capacitor iOS (if you add later)
+ios/App/App/build/
+ios/App/Pods/
+
+# Environment files
+.env

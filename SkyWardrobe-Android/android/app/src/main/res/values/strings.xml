@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">skywardrobe</string>
+    <string name="title_activity_main">skywardrobe</string>
+    <string name="package_name">com.skywardrobe.app</string>
+    <string name="custom_url_scheme">com.skywardrobe.app</string>
+</resources>

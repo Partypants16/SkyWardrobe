@@ -1,0 +1,17 @@
+{
+  "name": "skywardrobe-android",
+  "version": "1.0.0",
+  "description": "Android mobile wrapper for SkyWardrobe",
+  "main": "index.js",
+  "scripts": {
+    "build": "node scripts/build-www.js",
+    "cap:sync": "npm run build && npx cap sync",
+    "cap:open": "npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
+    "dotenv": "^17.4.2"
+  }
+}
