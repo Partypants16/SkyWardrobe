@@ -5,17 +5,98 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SkyWardrobe Dashboard</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
     :root {
-      --page: #edf3f1;
-      --ink: #17211f;
-      --muted: #63706d;
-      --panel: #ffffff;
-      --panel-soft: #f7faf9;
-      --line: #d8e2df;
       --blue: #246bb2;
       --teal: #087f83;
       --rose: #b64a5a;
-      --shadow: 0 18px 44px rgba(27, 40, 38, 0.12);
+    }
+
+    body {
+      --page: #edf3f1;
+      --ink: #17211f;
+      --muted: #63706d;
+      --panel: rgba(255, 255, 255, 0.45);
+      --panel-soft: rgba(255, 255, 255, 0.3);
+      --line: rgba(216, 226, 223, 0.4);
+      --accent: var(--teal);
+      --shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.06);
+      --theme-bg: linear-gradient(135deg, rgba(36, 107, 178, 0.12), transparent 34%),
+                  linear-gradient(225deg, rgba(8, 127, 131, 0.13), transparent 38%),
+                  var(--page);
+    }
+
+    body.theme-clear {
+      --page: #fffbf0;
+      --ink: #2b1f00;
+      --muted: #735c2b;
+      --line: rgba(250, 234, 195, 0.4);
+      --panel: rgba(255, 253, 245, 0.55);
+      --panel-soft: rgba(255, 253, 245, 0.4);
+      --accent: #d88a00;
+      --shadow: 0 8px 32px 0 rgba(216, 138, 0, 0.05);
+      --theme-bg: linear-gradient(135deg, rgba(254, 215, 102, 0.25), transparent 45%),
+                  linear-gradient(225deg, rgba(243, 114, 44, 0.15), transparent 45%),
+                  var(--page);
+    }
+
+    body.theme-clouds {
+      --page: #f0f4f5;
+      --ink: #202a30;
+      --muted: #606f7a;
+      --line: rgba(219, 228, 230, 0.4);
+      --panel: rgba(255, 255, 255, 0.5);
+      --panel-soft: rgba(240, 244, 245, 0.4);
+      --accent: var(--teal);
+      --shadow: 0 8px 32px 0 rgba(8, 127, 131, 0.05);
+      --theme-bg: linear-gradient(135deg, rgba(96, 111, 122, 0.15), transparent 45%),
+                  linear-gradient(225deg, rgba(8, 127, 131, 0.12), transparent 45%),
+                  var(--page);
+    }
+
+    body.theme-rain {
+      --page: #ebf1f5;
+      --ink: #172430;
+      --muted: #4e5f6f;
+      --line: rgba(207, 224, 238, 0.4);
+      --panel: rgba(255, 255, 255, 0.5);
+      --panel-soft: rgba(244, 248, 250, 0.45);
+      --accent: var(--blue);
+      --shadow: 0 8px 32px 0 rgba(36, 107, 178, 0.05);
+      --theme-bg: linear-gradient(135deg, rgba(36, 107, 178, 0.2), transparent 45%),
+                  linear-gradient(225deg, rgba(78, 95, 111, 0.15), transparent 45%),
+                  var(--page);
+    }
+
+    body.theme-snow {
+      --page: #f3f8fb;
+      --ink: #1b262c;
+      --muted: #536f7d;
+      --line: rgba(223, 235, 242, 0.4);
+      --panel: rgba(255, 255, 255, 0.65);
+      --panel-soft: rgba(248, 251, 253, 0.55);
+      --accent: #4895ef;
+      --shadow: 0 8px 32px 0 rgba(72, 149, 239, 0.06);
+      --theme-bg: linear-gradient(135deg, rgba(72, 149, 239, 0.15), transparent 45%),
+                  linear-gradient(225deg, rgba(200, 220, 240, 0.25), transparent 45%),
+                  var(--page);
+    }
+
+    body.theme-night {
+      --page: #0b0f19;
+      --ink: #f8fafc;
+      --muted: #94a3b8;
+      --panel: rgba(30, 41, 59, 0.5);
+      --panel-soft: rgba(15, 23, 42, 0.45);
+      --line: rgba(51, 65, 85, 0.45);
+      --blue: #38bdf8;
+      --teal: #2dd4bf;
+      --accent: #a855f7;
+      --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25);
+      --theme-bg: linear-gradient(135deg, rgba(168, 85, 247, 0.15), transparent 45%),
+                  linear-gradient(225deg, rgba(15, 23, 42, 0.5), transparent 45%),
+                  var(--page);
     }
 
     * {
@@ -25,12 +106,10 @@
     body {
       margin: 0;
       min-height: 100vh;
-      font-family: Arial, Helvetica, sans-serif;
-      background:
-        linear-gradient(135deg, rgba(36, 107, 178, 0.12), transparent 34%),
-        linear-gradient(225deg, rgba(8, 127, 131, 0.13), transparent 38%),
-        var(--page);
+      font-family: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--theme-bg);
       color: var(--ink);
+      transition: background 0.8s ease, color 0.5s ease;
     }
 
     .dashboard {
@@ -55,7 +134,8 @@
       margin: 0 0 7px;
       font-size: 3.1rem;
       line-height: 1;
-      letter-spacing: 0;
+      letter-spacing: -0.02em;
+      font-weight: 800;
     }
 
     .subtitle,
@@ -65,24 +145,41 @@
       margin: 0;
       color: var(--muted);
       line-height: 1.5;
+      transition: color 0.5s ease;
     }
 
     .refresh-button {
       border: 0;
-      border-radius: 8px;
-      background: var(--blue);
+      border-radius: 10px;
+      background: var(--accent);
       color: #ffffff;
       cursor: pointer;
+      font-family: inherit;
       font-size: 1rem;
       font-weight: 700;
       min-height: 44px;
-      padding: 0 18px;
+      padding: 0 20px;
       white-space: nowrap;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .refresh-button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      filter: brightness(1.1);
+    }
+
+    .theme-night .refresh-button:hover:not(:disabled) {
+      box-shadow: 0 4px 15px rgba(168, 85, 247, 0.35);
+    }
+
+    .refresh-button:active:not(:disabled) {
+      transform: translateY(0);
     }
 
     .refresh-button:disabled {
       cursor: wait;
-      opacity: 0.7;
+      opacity: 0.6;
     }
 
     .hero-grid {
@@ -96,10 +193,16 @@
     .wardrobe-panel,
     .weather-card,
     .data-panel {
-      background: rgba(255, 255, 255, 0.94);
+      background: var(--panel);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 16px;
       box-shadow: var(--shadow);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                  box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                  border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                  background 0.5s ease;
     }
 
     .current-weather {
@@ -114,15 +217,22 @@
     .weather-icon {
       width: 120px;
       height: 120px;
-      border-radius: 8px;
+      border-radius: 12px;
       background: var(--panel-soft);
+      animation: floatIcon 4s ease-in-out infinite;
+      transition: background 0.5s ease;
+    }
+
+    @keyframes floatIcon {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
     }
 
     .temperature {
       margin: 0;
       font-size: 7rem;
       font-weight: 800;
-      letter-spacing: 0;
+      letter-spacing: -0.03em;
       line-height: 0.9;
     }
 
@@ -148,6 +258,7 @@
       color: var(--muted);
       font-size: 0.95rem;
       padding: 8px 10px;
+      transition: background 0.5s ease, border-color 0.5s ease, color 0.5s ease;
     }
 
     .wardrobe-panel {
@@ -166,6 +277,7 @@
       letter-spacing: 0.08em;
       margin-bottom: 10px;
       text-transform: uppercase;
+      transition: color 0.5s ease;
     }
 
     .outfit-container {
@@ -177,9 +289,19 @@
 
     .outfit-item {
       padding: 12px;
-      border-radius: 6px;
+      border-radius: 10px;
       background: var(--panel-soft);
-      border-left: 4px solid var(--teal);
+      border-left: 4px solid var(--accent);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.5s ease;
+    }
+
+    .outfit-item:hover {
+      transform: scale(1.02);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+    }
+
+    .theme-night .outfit-item:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     }
 
     .outfit-category {
@@ -215,9 +337,25 @@
       padding: 18px;
     }
 
+    .weather-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+      border-color: var(--accent);
+    }
+
+    .theme-night .weather-card:hover {
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+      border-color: var(--accent);
+    }
+
     .weather-card.feature {
-      background: linear-gradient(180deg, #ffffff, #f3faf9);
-      border-color: rgba(8, 127, 131, 0.2);
+      background: rgba(255, 255, 255, 0.55);
+      border-color: var(--accent);
+    }
+
+    .theme-night .weather-card.feature {
+      background: rgba(30, 41, 59, 0.6);
+      border-color: var(--accent);
     }
 
     .metric {

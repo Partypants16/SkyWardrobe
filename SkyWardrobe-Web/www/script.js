@@ -323,6 +323,28 @@ function renderDashboard() {
   }
 
   dashboardState.weather = weather;
+
+  // Apply dynamic weather-driven body themes
+  document.body.className = "";
+  const isNight = weather.dt && weather.sys?.sunrise && weather.sys?.sunset &&
+                  (weather.dt < weather.sys.sunrise || weather.dt > weather.sys.sunset);
+
+  if (isNight) {
+    document.body.classList.add("theme-night");
+  } else {
+    const mainWeather = (weather.main || "").toLowerCase();
+    if (mainWeather.includes("clear")) {
+      document.body.classList.add("theme-clear");
+    } else if (mainWeather.includes("cloud")) {
+      document.body.classList.add("theme-clouds");
+    } else if (mainWeather.includes("rain") || mainWeather.includes("drizzle") || mainWeather.includes("thunderstorm")) {
+      document.body.classList.add("theme-rain");
+    } else if (mainWeather.includes("snow")) {
+      document.body.classList.add("theme-snow");
+    } else {
+      document.body.classList.add("theme-clouds");
+    }
+  }
   const iconUrl = weather.icon ? `https://openweathermap.org/img/wn/${weather.icon}@2x.png` : "";
   const lon = weather.coord?.lon;
   const lat = weather.coord?.lat;
