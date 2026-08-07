@@ -111,5 +111,16 @@ window.HourlyComponent = (function () {
       <p class="muted-text">Loading hourly data…</p>`;
   }
 
-  return { render, setLoading };
+  function setError(containerId) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = `
+      <div class="section-header">
+        <span class="section-icon">🕐</span>
+        <h2 class="section-title">Hourly Forecast</h2>
+      </div>
+      <p class="error-text">Hourly forecast temporarily unavailable.</p>`;
+  }
+
+  return { render, setLoading, setError };
 })();

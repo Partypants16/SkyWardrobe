@@ -2,3 +2,5 @@ node_modules/
 .npm-cache/
 .env
 www/config.js
+terminal_logs/
+*.bak

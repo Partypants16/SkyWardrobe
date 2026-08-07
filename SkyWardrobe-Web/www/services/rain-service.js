@@ -2,8 +2,11 @@
  * RainService — pure rain-logic functions (no DOM).
  * All functions operate on the OWM /forecast list array.
  * Each list item has: { dt, pop, rain_3h, snow_3h, temp, feels_like, wind_speed, weather_main, ... }
+ *
+ * Exposed as window.RainService in the browser and module.exports in Node
+ * (so the pure logic below can be covered by automated tests without a DOM).
  */
-window.RainService = (function () {
+const RainService = (function () {
   // ── Thresholds ──────────────────────────────────────────────────────────────
   const RAIN_PROB_THRESHOLD    = 0.40; // >= 40% probability → rain likely
   const RAIN_POSSIBLE_THRESHOLD = 0.20; // >= 20% → possible rain (softer signal)
@@ -20,6 +23,16 @@ window.RainService = (function () {
   const OUTDOOR_MAX_WIND   = 12;   // m/s
   const OUTDOOR_MAX_POP    = 0.30; // 30%
   const OUTDOOR_MIN_SLOTS  = 2;    // minimum consecutive 3h slots to count
+
+  // OpenWeatherMap's /forecast endpoint reports one snapshot every 3 hours.
+  // Every "next rain" / rain-window / insight / outdoor-window calculation is
+  // capped to this many slots (8 × 3h = 24h) so all rain-related UI sections
+  // agree on the same forecast horizon, and so we never surface a forecast
+  // point days out as if it were near-term guidance.
+  const FORECAST_HORIZON_SLOTS = 8; // 24h at 3h/slot
+  // How close (in hours) the next rain slot must be before we say "soon"
+  // rather than just naming the clock time it becomes likely.
+  const RAIN_IMMINENT_HOURS = 1.5;
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -88,24 +101,26 @@ window.RainService = (function () {
   function findNextRainEvent(list) {
     if (!Array.isArray(list)) return null;
     const nowSec = Date.now() / 1000;
-    return list.find((item) => item.dt >= nowSec && isRainLikely(item)) || null;
+    const horizon = list.filter((item) => item.dt >= nowSec).slice(0, FORECAST_HORIZON_SLOTS);
+    return horizon.find(isRainLikely) || null;
   }
 
   /**
    * Group consecutive rainy forecast slots into RainPeriod objects.
    * Merges consecutive items separated by at most one non-rainy slot (gap tolerance).
+   * Limited to FORECAST_HORIZON_SLOTS so this agrees with the graph/hourly/insights
+   * sections, which all describe the same "next 24 hours" window.
    */
   function groupRainPeriods(list) {
     if (!Array.isArray(list) || list.length === 0) return [];
     const nowSec = Date.now() / 1000 - 3600; // Include current hour
+    const relevant = list.filter((item) => item.dt >= nowSec).slice(0, FORECAST_HORIZON_SLOTS);
     const periods = [];
     let current = null;
     let gapCount = 0;
     const GAP_TOLERANCE = 1; // allow 1 non-rainy slot gap to merge periods
 
-    for (const item of list) {
-      if (item.dt < nowSec) continue;
-
+    for (const item of relevant) {
       if (isRainLikely(item)) {
         gapCount = 0;
         if (!current) {
@@ -155,17 +170,20 @@ window.RainService = (function () {
     }
 
     if (!nextRain) {
-      return "No rain expected in the next 24 hours.";
+      return "No meaningful rain expected in the next 24 hours.";
     }
 
+    // OpenWeatherMap's forecast only has one data point every 3 hours, so we
+    // never claim minute-level precision ("in 45 minutes") — that would be
+    // false precision the data can't support. Instead we always name the
+    // clock time the rain becomes likely, qualified by how soon that is.
     const nowSec    = Date.now() / 1000;
-    const minAway   = Math.round((nextRain.dt - nowSec) / 60);
-    const hoursAway = minAway / 60;
+    const hoursAway = (nextRain.dt - nowSec) / 3600;
+    const timeLabel = formatDateTime(nextRain.dt, tz);
 
-    if (minAway <= 5)      return "Rain possible right now.";
-    if (minAway < 60)      return `Rain expected in about ${minAway} minutes.`;
-    if (hoursAway < 2)     return `Rain likely around ${formatTime(nextRain.dt, tz)}.`;
-    return `Rain expected around ${formatTime(nextRain.dt, tz)}.`;
+    if (hoursAway <= 0)                    return "Rain possible right now.";
+    if (hoursAway <= RAIN_IMMINENT_HOURS)   return `Rain becoming likely soon, around ${timeLabel}.`;
+    return `Rain becomes likely around ${timeLabel}.`;
   }
 
   function generateInsights(list, currentWeather, timezoneOffset) {
@@ -299,8 +317,8 @@ window.RainService = (function () {
     return {
       startDt:  windowItems[0].dt,
       endDt:    windowItems[windowItems.length - 1].dt + 10800,
-      startTime: formatTime(windowItems[0].dt, tz),
-      endTime:   formatTime(windowItems[windowItems.length - 1].dt + 10800, tz),
+      startTime: formatDateTime(windowItems[0].dt, tz),
+      endTime:   formatDateTime(windowItems[windowItems.length - 1].dt + 10800, tz),
       minTemp:   Math.round(Math.min(...temps)),
       maxTemp:   Math.round(Math.max(...temps)),
       rainRisk,
@@ -327,6 +345,11 @@ window.RainService = (function () {
     RAIN_POSSIBLE_THRESHOLD,
     MM_LIGHT,
     MM_MODERATE,
-    MM_HEAVY
+    MM_HEAVY,
+    FORECAST_HORIZON_SLOTS,
+    RAIN_IMMINENT_HOURS
   };
 })();
+
+if (typeof window !== "undefined") window.RainService = RainService;
+if (typeof module !== "undefined" && module.exports) module.exports = RainService;
