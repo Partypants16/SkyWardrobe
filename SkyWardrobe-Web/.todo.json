@@ -1,0 +1,12 @@
+[
+  {
+    "content": "Add graph for location and sun details",
+    "active_form": "in_progress",
+    "status": "in_progress"
+  },
+  {
+    "content": "Insert text-only section for air quality, pollen counts and flu activity",
+    "active_form": "pending",
+    "status": "pending"
+  }
+]
