@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SkyWardrobe Dashboard</title>
+  <style>
+    :root {
+      --page: #edf3f1;
+      --ink: #17211f;
+      --muted: #63706d;
+      --panel: #ffffff;
+      --panel-soft: #f7faf9;
+      --line: #d8e2df;
+      --blue: #246bb2;
+      --teal: #087f83;
+      --rose: #b64a5a;
+      --shadow: 0 18px 44px rgba(27, 40, 38, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+      background:
+        linear-gradient(135deg, rgba(36, 107, 178, 0.12), transparent 34%),
+        linear-gradient(225deg, rgba(8, 127, 131, 0.13), transparent 38%),
+        var(--page);
+      color: var(--ink);
+    }
+
+    .dashboard {
+      width: min(1180px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 28px 0;
+    }
+
+    .topbar,
+    .footer-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .topbar {
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0 0 7px;
+      font-size: 3.1rem;
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .subtitle,
+    .status,
+    .meta,
+    .detail {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .refresh-button {
+      border: 0;
+      border-radius: 8px;
+      background: var(--blue);
+      color: #ffffff;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 700;
+      min-height: 44px;
+      padding: 0 18px;
+      white-space: nowrap;
+    }
+
+    .refresh-button:disabled {
+      cursor: wait;
+      opacity: 0.7;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .current-weather,
+    .wardrobe-panel,
+    .weather-card,
+    .data-panel {
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .current-weather {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 22px;
+      min-height: 300px;
+      padding: 28px;
+    }
+
+    .weather-icon {
+      width: 120px;
+      height: 120px;
+      border-radius: 8px;
+      background: var(--panel-soft);
+    }
+
+    .temperature {
+      margin: 0;
+      font-size: 7rem;
+      font-weight: 800;
+      letter-spacing: 0;
+      line-height: 0.9;
+    }
+
+    .description {
+      margin: 10px 0 6px;
+      color: var(--ink);
+      font-size: 1.45rem;
+      font-weight: 700;
+      text-transform: capitalize;
+    }
+
+    .mini-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-soft);
+      color: var(--muted);
+      font-size: 0.95rem;
+      padding: 8px 10px;
+    }
+
+    .wardrobe-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px;
+    }
+
+    .panel-label,
+    .card-label {
+      display: block;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+
+    .outfit-container {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 10px;
+    }
+
+    .outfit-item {
+      padding: 12px;
+      border-radius: 6px;
+      background: var(--panel-soft);
+      border-left: 4px solid var(--teal);
+    }
+
+    .outfit-category {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+
+    .outfit-name {
+      margin: 3px 0 2px;
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .outfit-desc {
+      margin: 0;
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.3;
+    }
+
+    .weather-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .weather-card {
+      min-height: 132px;
+      padding: 18px;
+    }
+
+    .weather-card.feature {
+      background: linear-gradient(180deg, #ffffff, #f3faf9);
+      border-color: rgba(8, 127, 131, 0.2);
+    }
+
+    .metric {
+      margin: 0;
+      font-size: 1.85rem;
+      font-weight: 800;
+      line-height: 1.1;
+      overflow-wrap: anywhere;
+    }
+
+    .detail {
+      margin-top: 8px;
+      font-size: 0.94rem;
+    }
+
+    .data-panel {
+      margin-top: 18px;
+      padding: 20px;
+    }
+
+    .data-title {
+      margin: 0 0 14px;
+      font-size: 1.2rem;
+    }
+
+    .data-list {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin: 0;
+    }
+
+    .data-item {
+      border-radius: 8px;
+      background: var(--panel-soft);
+      padding: 14px;
+    }
+
+    .data-item dt {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      margin-bottom: 7px;
+      text-transform: uppercase;
+    }
+
+    .data-item dd {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+
+    .footer-row {
+      margin-top: 18px;
+    }
+
+    .error {
+      color: var(--rose);
+      font-weight: 700;
+    }
+
+    @media (max-width: 980px) {
+      .hero-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .weather-grid,
+      .data-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 620px) {
+      .dashboard {
+        width: min(100% - 20px, 1180px);
+        padding: 18px 0;
+      }
+
+      .topbar,
+      .footer-row,
+      .current-weather {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .current-weather {
+        display: flex;
+        gap: 8px;
+        min-height: 0;
+        padding: 20px;
+      }
+
+      h1 {
+        font-size: 2.25rem;
+      }
+
+      .temperature {
+        font-size: 4.2rem;
+      }
+
+      .description {
+        font-size: 1.22rem;
+      }
+
+      .recommendation {
+        font-size: 1.45rem;
+      }
+
+      .weather-grid,
+      .data-list {
+        grid-template-columns: 1fr;
+      }
+
+      .weather-icon {
+        width: 88px;
+        height: 88px;
+      }
+
+      .refresh-button {
+        width: 100%;
+      }
+    }
+  </style>
+  <script src="config.js" defer></script>
+  <script src="script.js?v=4" defer></script>
+</head>
+<body>
+  <main class="dashboard" aria-live="polite">
+    <div class="topbar">
+      <div>
+        <h1>SkyWardrobe</h1>
+        <p class="subtitle" id="location">Melbourne weather translated into what to wear now.</p>
+      </div>
+      <button class="refresh-button" id="refreshButton" type="button">Refresh weather</button>
+    </div>
+
+    <section class="hero-grid" aria-label="Current weather and clothing guidance">
+      <div class="current-weather">
+        <img class="weather-icon" id="weatherIcon" alt="" hidden />
+        <div>
+          <p class="temperature" id="temperature">--</p>
+          <p class="description" id="description">Waiting for weather</p>
+          <p class="meta" id="feelsLike">Feels like --</p>
+          <div class="mini-row" aria-label="Temperature range and update details">
+            <span class="chip" id="tempRange">Range --</span>
+            <span class="chip" id="condition">Condition --</span>
+            <span class="chip" id="updatedAt">Measured --</span>
+          </div>
+        </div>
+      </div>
+
+      <aside class="wardrobe-panel">
+        <div>
+          <span class="panel-label">Outfit of the Day</span>
+          <div class="outfit-container">
+            <div class="outfit-item">
+              <span class="outfit-category">Top</span>
+              <p class="outfit-name" id="outfitTop">Checking database...</p>
+              <p class="outfit-desc" id="outfitTopDesc"></p>
+            </div>
+            <div class="outfit-item">
+              <span class="outfit-category">Bottom</span>
+              <p class="outfit-name" id="outfitBottom">Checking database...</p>
+              <p class="outfit-desc" id="outfitBottomDesc"></p>
+            </div>
+            <div class="outfit-item">
+              <span class="outfit-category">Outerwear</span>
+              <p class="outfit-name" id="outfitOuterwear">Checking database...</p>
+              <p class="outfit-desc" id="outfitOuterwearDesc"></p>
+            </div>
+            <div class="outfit-item">
+              <span class="outfit-category">Footwear</span>
+              <p class="outfit-name" id="outfitFootwear">Checking database...</p>
+              <p class="outfit-desc" id="outfitFootwearDesc"></p>
+            </div>
+            <div class="outfit-item">
+              <span class="outfit-category">Accessory</span>
+              <p class="outfit-name" id="outfitAccessory">Checking database...</p>
+              <p class="outfit-desc" id="outfitAccessoryDesc"></p>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="weather-grid" aria-label="Weather measurements">
+      <article class="weather-card feature">
+        <span class="card-label">Humidity</span>
+        <p class="metric" id="humidity">--</p>
+        <p class="detail">How sticky the air feels.</p>
+      </article>
+      <article class="weather-card feature">
+        <span class="card-label">Wind</span>
+        <p class="metric" id="windSpeed">--</p>
+        <p class="detail" id="windDirection">Direction --</p>
+      </article>
+      <article class="weather-card">
+        <span class="card-label">Gusts</span>
+        <p class="metric" id="windGust">--</p>
+        <p class="detail">Sudden stronger wind bursts.</p>
+      </article>
+      <article class="weather-card">
+        <span class="card-label">Cloud cover</span>
+        <p class="metric" id="clouds">--</p>
+        <p class="detail">Percentage of sky covered.</p>
+      </article>
+      <article class="weather-card">
+        <span class="card-label">Pressure</span>
+        <p class="metric" id="pressure">--</p>
+        <p class="detail" id="pressureLevels">Sea / ground --</p>
+      </article>
+      <article class="weather-card">
+        <span class="card-label">Visibility</span>
+        <p class="metric" id="visibility">--</p>
+        <p class="detail">Maximum current visibility.</p>
+      </article>
+      <article class="weather-card">
+        <span class="card-label">Rain</span>
+        <p class="metric" id="rain">--</p>
+        <p class="detail">Recent measured rainfall.</p>
+      </article>
+      <article class="weather-card">
+        <span class="card-label">Snow</span>
+        <p class="metric" id="snow">--</p>
+        <p class="detail">Recent measured snowfall.</p>
+      </article>
+    </section>
+
+    <section class="data-panel" aria-label="Location and sun details">
+      <h2 class="data-title">Location and sun details</h2>
+      <dl class="data-list">
+        <div class="data-item">
+          <dt>Coordinates</dt>
+          <dd id="coordinates">--</dd>
+        </div>
+        <div class="data-item">
+          <dt>Country</dt>
+          <dd id="country">--</dd>
+        </div>
+        <div class="data-item">
+          <dt>Sunrise</dt>
+          <dd id="sunrise">--</dd>
+        </div>
+        <div class="data-item">
+          <dt>Sunset</dt>
+          <dd id="sunset">--</dd>
+        </div>
+        <div class="data-item">
+          <dt>Timezone</dt>
+          <dd id="timezone">--</dd>
+        </div>
+        <div class="data-item">
+          <dt>City ID</dt>
+          <dd id="cityId">--</dd>
+        </div>
+        <div class="data-item">
+          <dt>Station type</dt>
+          <dd id="stationType">--</dd>
+        </div>
+        <div class="data-item">
+          <dt>Base</dt>
+          <dd id="base">--</dd>
+        </div>
+      </dl>
+    </section>
+
+    <div class="footer-row">
+      <p class="status" id="status">Loading weather data...</p>
+      <p class="meta" id="lastUpdated">Last refreshed: --</p>
+    </div>
+  </main>
+</body>
+</html>
