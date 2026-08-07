@@ -33,8 +33,7 @@ window.RainGraphComponent = (function () {
 
   // ── Canvas drawing ───────────────────────────────────────────────────────────
   function draw(canvas, list, nextRain, tz) {
-    const items = list.slice(0, 8);   // 24h / 3h slots
-    if (items.length === 0) return;
+    const items = (list || []).slice(0, 8);   // 24h / 3h slots
 
     const dpr     = window.devicePixelRatio || 1;
     const w       = canvas.clientWidth  || 600;
@@ -44,6 +43,17 @@ window.RainGraphComponent = (function () {
 
     const ctx = canvas.getContext("2d");
     ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+
+    if (items.length === 0) {
+      const colors = getThemeColors();
+      ctx.fillStyle    = colors.muted;
+      ctx.font         = `13px 'Outfit', system-ui`;
+      ctx.textAlign    = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("No precipitation forecast data available.", w / 2, h / 2);
+      return;
+    }
 
     const colors = getThemeColors();
     const P      = PADDING;
@@ -51,9 +61,6 @@ window.RainGraphComponent = (function () {
     const innerH = h - P.top  - P.bottom;
     const barW   = innerW / items.length;
     const nowSec = Date.now() / 1000;
-
-    // Background clear
-    ctx.clearRect(0, 0, w, h);
 
     // ── Grid lines ────────────────────────────────────────────────────────────
     ctx.strokeStyle = colors.line;
@@ -199,7 +206,12 @@ window.RainGraphComponent = (function () {
     ctx.font         = `${11 * Math.min(1, w / 400)}px 'Outfit', system-ui`;
     ctx.textAlign    = "center";
     ctx.textBaseline = "top";
-    for (let i = 0; i < items.length; i++) {
+    // On narrow screens 8 labels don't all fit without overlapping — measure
+    // the widest one and thin them out (every 2nd/3rd/4th) until each label
+    // has room to breathe, rather than letting adjacent labels collide.
+    const widestLabelW = Math.max(...items.map((item) => ctx.measureText(RS.formatTime(item.dt, tz || 0)).width));
+    const labelStep = Math.max(1, Math.ceil((widestLabelW + 6) / barW));
+    for (let i = 0; i < items.length; i += labelStep) {
       const item = items[i];
       const x    = P.left + i * barW + barW / 2;
       const t    = RS.formatTime(item.dt, tz || 0);

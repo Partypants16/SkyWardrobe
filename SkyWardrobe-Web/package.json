@@ -8,7 +8,9 @@
     "build": "node scripts/build-www.js",
     "init-db": "node scripts/init-db.js",
     "seed-db": "node scripts/seed-fashiongen.js",
-    "test": "node --check logic.js && node --check www/script.js && node --check scripts/build-www.js"
+    "test:syntax": "node --check logic.js && node --check db.js && node --check scripts/build-www.js && node --check scripts/init-db.js && node --check scripts/seed-fashiongen.js && node --check www/script.js && node --check www/services/rain-service.js && node --check www/services/wardrobe-rain.js && node --check www/services/radar-frames.js && node --check www/components/next-rain.js && node --check www/components/rain-graph.js && node --check www/components/hourly.js && node --check www/components/insights.js && node --check www/components/outdoor-window.js && node --check www/components/radar.js",
+    "test:unit": "node --test \"tests/**/*.test.js\"",
+    "test": "npm run test:syntax && npm run test:unit"
   },
   "keywords": [],
   "author": "",

@@ -1,9 +1,30 @@
 /**
  * WardrobeRain — generates rain-aware wardrobe notes and accessory recommendations.
  * Depends on RainService being loaded first.
+ *
+ * Exposed as window.WardrobeRain in the browser and module.exports in Node
+ * (so the pure logic below can be covered by automated tests without a DOM).
  */
-window.WardrobeRain = (function () {
-  const RS = window.RainService;
+const WardrobeRain = (function () {
+  const RS = typeof window !== "undefined" && window.RainService
+    ? window.RainService
+    : require("./rain-service.js");
+
+  // ── Thresholds (kept as named constants rather than scattered literals) ──────
+  // Umbrella recommendation reuses RainService's own "rain likely" probability
+  // bar, so wardrobe advice and the next-rain headline never disagree.
+  const UMBRELLA_POP_THRESHOLD  = RS.RAIN_PROB_THRESHOLD; // 0.40
+  const JACKET_POP_THRESHOLD    = 0.65; // high confidence...
+  const JACKET_MM_THRESHOLD     = 3;    // ...combined with a meaningful amount (mm/3h)
+  const PROLONGED_RAIN_SLOTS    = 2;    // 2+ consecutive 3h slots (6h+) counts as "prolonged"
+  const PROLONGED_RAIN_SECONDS  = 10800 * PROLONGED_RAIN_SLOTS;
+  const SOON_HOURS_HORIZON      = 6;    // "dry for now, but rain likely around X" window
+  const PLANNING_HOURS_HORIZON  = 12;   // beyond this we soften urgency language
+
+  function isProlonged(rainPeriods) {
+    return Array.isArray(rainPeriods) && rainPeriods.length > 0 &&
+      (rainPeriods[0].endDt - rainPeriods[0].startDt) >= PROLONGED_RAIN_SECONDS;
+  }
 
   /**
    * Generates a contextual note about rain for the wardrobe panel.
@@ -30,30 +51,29 @@ window.WardrobeRain = (function () {
       return "No rain expected in the next 24 hours. Dress for the temperature alone.";
     }
 
-    const minAway   = Math.round((nextRain.dt - nowSec) / 60);
-    const hoursAway = minAway / 60;
-    const timeLabel = RS.formatTime(nextRain.dt, tz);
+    const hoursAway = (nextRain.dt - nowSec) / 3600;
+    // Day-aware label (e.g. "Tue 6:00 PM") so advice never implies "today"
+    // for a rain slot that's actually tomorrow, even within the 24h horizon.
+    const timeLabel = RS.formatDateTime(nextRain.dt, tz);
     const intensity = RS.getRainIntensity(nextRain.rain_3h);
+    const prolonged = isProlonged(rainPeriods);
 
-    // Determine duration (is it prolonged rain?)
-    const prolonged = rainPeriods.length > 0 &&
-      (rainPeriods[0].endDt - rainPeriods[0].startDt) >= 10800 * 2; // 2+ slots = 6h
-
-    if (hoursAway <= 1.5) {
+    if (hoursAway <= RS.RAIN_IMMINENT_HOURS) {
       if (intensity === "heavy" || intensity === "severe") {
         return `Heavy rain arriving around ${timeLabel} — take waterproof gear and boots.`;
       }
       return `Rain arriving around ${timeLabel} — pack an umbrella before you leave.`;
     }
 
-    if (hoursAway <= 6) {
+    if (hoursAway <= SOON_HOURS_HORIZON) {
       const intensityNote = intensity === "moderate" || intensity === "heavy"
         ? ` (${intensity} rain expected)`
         : "";
-      return `Dry for now, but rain likely around ${timeLabel}${intensityNote}. Take a jacket or umbrella if you'll be out.`;
+      const prolongedNote = prolonged ? " This looks like a longer spell of rain, not just a quick shower." : "";
+      return `Dry for now, but rain likely around ${timeLabel}${intensityNote}. Take a jacket or umbrella if you'll be out.${prolongedNote}`;
     }
 
-    if (hoursAway <= 12) {
+    if (hoursAway <= PLANNING_HOURS_HORIZON) {
       return `Rain expected this ${timeOfDay(nextRain.dt, tz)} around ${timeLabel}. No urgency right now, but plan ahead.`;
     }
 
@@ -84,15 +104,18 @@ window.WardrobeRain = (function () {
     const pop        = nextRain?.pop || (raining ? 1 : 0);
     const mm3h       = nextRain?.rain_3h || (raining ? (currentWeather.rain_1h || 0) * 3 : 0);
     const intensity  = RS.getRainIntensity(mm3h);
-    const prolonged  = rainPeriods.length > 0 &&
-      (rainPeriods[0].endDt - rainPeriods[0].startDt) >= 10800 * 2;
+    const prolonged  = isProlonged(rainPeriods);
 
-    const needsUmbrella         = pop >= 0.40;
-    const needsWaterproofShoes  = intensity === "moderate" || intensity === "heavy" || intensity === "severe";
-    const needsRainJacket       = prolonged || intensity === "heavy" || intensity === "severe" || (pop >= 0.65 && mm3h >= 3);
+    const needsUmbrella        = pop >= UMBRELLA_POP_THRESHOLD;
+    const needsWaterproofShoes = intensity === "moderate" || intensity === "heavy" || intensity === "severe";
+    const needsRainJacket      = prolonged || intensity === "heavy" || intensity === "severe" ||
+      (pop >= JACKET_POP_THRESHOLD && mm3h >= JACKET_MM_THRESHOLD);
 
     return { needsUmbrella, needsWaterproofShoes, needsRainJacket, intensity, pop };
   }
 
   return { generateRainNote, getAccessories };
 })();
+
+if (typeof window !== "undefined") window.WardrobeRain = WardrobeRain;
+if (typeof module !== "undefined" && module.exports) module.exports = WardrobeRain;

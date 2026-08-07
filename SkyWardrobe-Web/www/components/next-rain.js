@@ -26,8 +26,8 @@ window.NextRainComponent = (function () {
 
   function renderPeriodCard(period, tz, isFirst) {
     const meta   = intensityMeta(period.maxIntensity);
-    const startT = RS.formatTime(period.startDt, tz);
-    const endT   = RS.formatTime(period.endDt, tz);
+    const startT = RS.formatDateTime(period.startDt, tz);
+    const endT   = RS.formatDateTime(period.endDt, tz);
     const dur    = formatDuration(period.startDt, period.endDt);
     const popPct = Math.round(period.maxPop * 100);
     const mm     = period.totalMm > 0 ? `${period.totalMm.toFixed(1)} mm expected` : null;

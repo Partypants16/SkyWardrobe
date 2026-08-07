@@ -4,52 +4,71 @@
  * No API key required.
  */
 window.RadarComponent = (function () {
+  const RF = window.RadarFrames;
+
   // ── State ────────────────────────────────────────────────────────────────────
   let _map          = null;
   let _marker       = null;
-  let _layers       = [];
+  let _activeLayer  = null; // exactly one RainViewer tile layer is ever attached to the map
   let _frames       = [];
   let _currentIdx   = 0;
-  let _playing      = true;
-  let _timer        = null;
+  let _playing      = true;   // the user's intended play/pause state
+  let _timer        = null;   // only non-null while actually animating
   let _initialized  = false;
   let _host         = "";
   let _lat          = -37.814;
   let _lon          = 144.963;
+  let _onResize     = null;
+  let _onVisibility = null;
 
   const FRAME_MS    = 600;
   const TILE_SIZE   = 256;
   const COLOR_SCHEME = 2; // Universal Blue
   const OPTIONS     = "1_1";   // smooth=1, snow=1
+  const RAINVIEWER_ATTRIBUTION =
+    'Rain data © <a href="https://rainviewer.com" target="_blank" rel="noopener">RainViewer</a>';
 
   // ── RainViewer helpers ───────────────────────────────────────────────────────
-  function tileUrl(frame) {
-    return `${_host}${frame.path}/${TILE_SIZE}/{z}/{x}/{y}/${COLOR_SCHEME}/${OPTIONS}.png`;
-  }
-
   async function fetchFrames() {
     const resp = await fetch("https://api.rainviewer.com/public/weather-maps.json");
     if (!resp.ok) throw new Error(`RainViewer API returned ${resp.status}`);
     const data = await resp.json();
     _host = data.host || "https://tilecache.rainviewer.com";
-
-    const past    = (data.radar?.past     || []).map((f) => ({ ...f, type: "past" }));
-    const nowcast = (data.radar?.nowcast  || []).map((f) => ({ ...f, type: "nowcast" }));
-    return [...past, ...nowcast];
+    return RF.buildFrameList(data.radar);
   }
 
   // ── Layer helpers ────────────────────────────────────────────────────────────
+  // Only the currently-visible frame's tile layer is ever attached to the map.
+  // Older implementations kept every frame's layer loaded simultaneously,
+  // which meant every frame's tiles were fetched (and stayed resident) at
+  // once — this swaps a single layer in/out instead, so switching frames
+  // costs one set of tile requests (browser HTTP cache serves repeats on
+  // loop) rather than requesting every frame up front.
   function showFrame(idx) {
-    if (_layers.length === 0) return;
-    const clamped = Math.max(0, Math.min(idx, _layers.length - 1));
-    _layers.forEach((layer, i) => layer.setOpacity(i === clamped ? 0.65 : 0));
+    if (_frames.length === 0) return;
+    const clamped = Math.max(0, Math.min(idx, _frames.length - 1));
+    const frame = _frames[clamped];
+
+    const newLayer = L.tileLayer(RF.tileUrl(_host, frame, { tileSize: TILE_SIZE, colorScheme: COLOR_SCHEME, options: OPTIONS }), {
+      opacity:     0.65,
+      tileSize:    TILE_SIZE,
+      maxZoom:     19,
+      zIndex:      10,
+      attribution: RAINVIEWER_ATTRIBUTION
+    });
+    newLayer.addTo(_map);
+
+    const previousLayer = _activeLayer;
+    _activeLayer = newLayer;
+    if (previousLayer) _map.removeLayer(previousLayer);
+
     _currentIdx = clamped;
     updateTimeline();
     updateTimestampLabel();
   }
 
   function nextFrame() {
-    showFrame((_currentIdx + 1) % _layers.length);
+    showFrame((_currentIdx + 1) % _frames.length);
   }
 
   function startAnim() {
@@ -95,12 +114,17 @@ window.RadarComponent = (function () {
     const el = document.getElementById("radar-time-labels-inner");
     if (!el || _frames.length === 0) return;
 
-    const nowIdx = _frames.findLastIndex((f) => f.type === "past");
-    const pct    = nowIdx >= 0 ? (nowIdx / (_frames.length - 1)) * 100 : 50;
+    const pct = RF.nowMarkerPercent(_frames);
+    // RainViewer frequently has no nowcast frames at all, which puts the
+    // "Now" marker right at (or past) the far edge — directly under the
+    // static "Past"/"Forecast" label there. Drop whichever static label
+    // "Now" would collide with instead of letting the text overlap.
+    const pastLabel     = pct <= 8  ? "" : `<span class="radar-tl-label">Past</span>`;
+    const forecastLabel = pct >= 92 ? "" : `<span class="radar-tl-label radar-tl-label--right">Forecast</span>`;
     el.innerHTML = `
-      <span class="radar-tl-label">Past</span>
+      ${pastLabel}
       <span class="radar-tl-now" style="left:${pct}%">Now</span>
-      <span class="radar-tl-label radar-tl-label--right">Forecast</span>`;
+      ${forecastLabel}`;
   }
 
   function showRadarError() {
@@ -120,22 +144,7 @@ window.RadarComponent = (function () {
 
       if (_frames.length === 0) throw new Error("No radar frames available");
 
-      // Build tile layers (all hidden initially)
-      _layers = _frames.map((frame) => {
-        return L.tileLayer(tileUrl(frame), {
-          opacity:     0,
-          tileSize:    TILE_SIZE,
-          maxZoom:     19,
-          zIndex:      10,
-          attribution: 'Rain data © <a href="https://rainviewer.com" target="_blank" rel="noopener">RainViewer</a>'
-        });
-      });
-      _layers.forEach((layer) => layer.addTo(_map));
-
-      // Default to last past frame
-      const lastPastIdx = _frames.findLastIndex((f) => f.type === "past");
-      _currentIdx = lastPastIdx >= 0 ? lastPastIdx : 0;
-
+      _currentIdx = RF.defaultFrameIndex(_frames);
       renderTimelineLabels();
 
       // Wire up the timeline scrubber click
@@ -202,6 +211,24 @@ window.RadarComponent = (function () {
       zIndexOffset: 1000
     }).addTo(_map).bindPopup("📍 Your location");
 
+    // Keep the map correctly sized across viewport/orientation changes —
+    // without this a Leaflet map can render with grey/mis-aligned tiles
+    // after the window is resized post-init.
+    _onResize = () => _map && _map.invalidateSize();
+    window.addEventListener("resize", _onResize);
+
+    // Pause the animation timer while the tab is hidden so we don't keep
+    // swapping (and re-requesting) radar tiles for a screen no one can see.
+    // Only resumes if the user hadn't explicitly paused it themselves.
+    _onVisibility = () => {
+      if (document.hidden) {
+        if (_timer) { clearInterval(_timer); _timer = null; }
+      } else if (_playing && !_timer && _frames.length > 0) {
+        _timer = setInterval(nextFrame, FRAME_MS);
+      }
+    };
+    document.addEventListener("visibilitychange", _onVisibility);
+
     // Load radar frames
     loadRadar();
   }
@@ -226,7 +253,10 @@ window.RadarComponent = (function () {
 
   function destroy() {
     stopAnim();
-    _layers = [];
+    if (_onResize) { window.removeEventListener("resize", _onResize); _onResize = null; }
+    if (_onVisibility) { document.removeEventListener("visibilitychange", _onVisibility); _onVisibility = null; }
+    if (_activeLayer && _map) _map.removeLayer(_activeLayer);
+    _activeLayer = null;
     _frames = [];
     if (_map) { _map.remove(); _map = null; }
     _initialized = false;

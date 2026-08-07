@@ -176,10 +176,10 @@ app.get("/weather", async (req, res) => {
 
     res.json({ ...weatherData, outfit });
   } catch (err) {
-    console.error("Weather fetch failed, returning mock data:", err.message);
+    console.error("Weather fetch failed, returning fallback placeholder data:", err.message);
     const weatherData = {
       coord: { lon: 144.9633, lat: -37.814 },
-      weather: [{ id: 800, main: "Clear", description: "clear sky (mock)", icon: "01d" }],
+      weather: [{ id: 800, main: "Clear", description: "clear sky (fallback data)", icon: "01d" }],
       temp: 15.0,
       feels_like: 14.5,
       temp_min: 13.0,
@@ -187,15 +187,17 @@ app.get("/weather", async (req, res) => {
       pressure: 1012,
       humidity: 62,
       wind_speed: 4.1,
-      name: "Melbourne (Mock)",
+      name: "Melbourne (fallback)",
       cod: 200,
       main: "Clear",
-      description: "clear sky (mock)",
+      description: "clear sky (fallback data)",
       icon: "01d"
     };
 
     const outfit = await generateOutfit(weatherData);
-    res.json({ ...weatherData, outfit });
+    // `mock: true` tells the client this is NOT live data, so it can be shown
+    // honestly rather than presented as a real current reading.
+    res.json({ ...weatherData, outfit, mock: true });
   }
 });
 
@@ -232,12 +234,12 @@ app.get("/forecast", async (req, res) => {
 // ── /geocode ──────────────────────────────────────────────────────────────────
 app.get("/geocode", async (req, res) => {
   try {
-    if (!process.env.OPENWEATHER_KEY) {
-      throw new Error("OPENWEATHER_KEY environment variable is not defined");
-    }
-
     if (!req.query.q) {
       return res.status(400).json({ error: "Query parameter 'q' is required" });
+    }
+
+    if (!process.env.OPENWEATHER_KEY) {
+      throw new Error("OPENWEATHER_KEY environment variable is not defined");
     }
 
     const response = await axios.get(OPENWEATHER_GEO_URL, {
