@@ -1,5 +1,0 @@
-window.SKYWARDROBE_CONFIG = {
-  "OPENWEATHER_KEY": "d07a1b52250ff24c45fc10870ef95cb4",
-  "OPENWEATHER_CITY": "Melbourne,AU",
-  "API_BASE_URL": ""
-};
