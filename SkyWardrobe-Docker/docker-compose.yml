@@ -1,0 +1,29 @@
+services:
+  skywardrobe:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: skywardrobe:latest
+    container_name: skywardrobe
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_PATH=/app/data/wardrobe.db
+      - OPENWEATHER_KEY=${OPENWEATHER_KEY:-}
+      - OPENWEATHER_CITY=${OPENWEATHER_CITY:-Melbourne,AU}
+      - SKYWARDROBE_API_BASE_URL=${SKYWARDROBE_API_BASE_URL:-}
+    volumes:
+      - wardrobe_data:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:' + (process.env.PORT || 3000) + '/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  wardrobe_data:
+    driver: local
