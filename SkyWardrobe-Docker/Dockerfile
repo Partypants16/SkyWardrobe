@@ -12,8 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy package manifests
-COPY package.json package-lock.json ./
+# Copy ONLY package.json (not package-lock.json) so npm generates a fresh
+# Linux-native lockfile instead of resolving Windows prebuilt binaries
+COPY package.json ./
 
 # Install dependencies WITHOUT running any pre-install/install scripts
 # (this prevents npm from downloading the pre-built platform-specific binary).
@@ -31,7 +32,7 @@ WORKDIR /app
 
 # Copy the source-compiled node_modules from the builder stage
 COPY --from=builder /app/node_modules ./node_modules
-COPY package.json package-lock.json ./
+COPY package.json ./
 
 # Copy application source files
 COPY logic.js db.js ./
@@ -39,7 +40,7 @@ COPY scripts/ ./scripts/
 COPY www/ ./www/
 COPY docker-entrypoint.sh ./
 
-# Create data directory, set executable permissions, and transfer ownership to node user
+# Create data directory, set permissions, and set ownership to node user
 RUN mkdir -p /app/data \
     && chmod +x /app/docker-entrypoint.sh \
     && chown -R node:node /app

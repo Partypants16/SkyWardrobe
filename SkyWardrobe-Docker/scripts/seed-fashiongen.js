@@ -1,8 +1,8 @@
 const path = require("path");
-const sqlite3 = require("sqlite3").verbose();
+const Database = require("better-sqlite3");
 
 const dbPath = process.env.DATABASE_PATH || path.join(__dirname, "..", "wardrobe.db");
-const db = new sqlite3.Database(dbPath);
+const db = new Database(dbPath);
 
 const clothingItems = [
   // TOPS
@@ -318,58 +318,36 @@ const clothingItems = [
 
 console.log(`Seeding database at ${dbPath} with ${clothingItems.length} FashionGen-styled items...`);
 
-db.serialize(() => {
-  // Clear existing items
-  db.run("DELETE FROM clothing_items", (err) => {
-    if (err) {
-      console.error("Error clearing clothing_items:", err.message);
-      process.exit(1);
+try {
+  // Clear existing items and insert all in a single transaction for atomicity and speed
+  const insertMany = db.transaction((items) => {
+    db.prepare("DELETE FROM clothing_items").run();
+
+    const stmt = db.prepare(`
+      INSERT INTO clothing_items (
+        name, category, min_temp, max_temp,
+        rain_suitable, rain_preferred,
+        wind_suitable, wind_preferred,
+        humidity_suitable, description
+      ) VALUES (
+        @name, @category, @min_temp, @max_temp,
+        @rain_suitable, @rain_preferred,
+        @wind_suitable, @wind_preferred,
+        @humidity_suitable, @description
+      )
+    `);
+
+    for (const item of items) {
+      stmt.run(item);
     }
   });
 
-  const stmt = db.prepare(`
-    INSERT INTO clothing_items (
-      name, category, min_temp, max_temp, 
-      rain_suitable, rain_preferred, 
-      wind_suitable, wind_preferred, 
-      humidity_suitable, description
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  for (const item of clothingItems) {
-    stmt.run([
-      item.name,
-      item.category,
-      item.min_temp,
-      item.max_temp,
-      item.rain_suitable,
-      item.rain_preferred,
-      item.wind_suitable,
-      item.wind_preferred,
-      item.humidity_suitable,
-      item.description
-    ], (err) => {
-      if (err) {
-        console.error(`Error inserting ${item.name}:`, err.message);
-      }
-    });
-  }
-
-  stmt.finalize((err) => {
-    if (err) {
-      console.error("Error finalizing statement:", err.message);
-      process.exit(1);
-    } else {
-      console.log("Database seeded successfully!");
-      db.close((closeErr) => {
-        if (closeErr) {
-          console.error("Error closing database:", closeErr.message);
-          process.exit(1);
-        } else {
-          console.log("Database connection closed.");
-          process.exit(0);
-        }
-      });
-    }
-  });
-});
+  insertMany(clothingItems);
+  console.log("Database seeded successfully!");
+  db.close();
+  console.log("Database connection closed.");
+  process.exit(0);
+} catch (err) {
+  console.error("Seeding failed:", err.message);
+  process.exit(1);
+}
