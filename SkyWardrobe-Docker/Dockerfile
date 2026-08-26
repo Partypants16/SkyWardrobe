@@ -5,7 +5,7 @@ FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
 
-# Install native build toolchain required to compile better-sqlite3 from source
+# Install native build toolchain required to compile sqlite3 from source
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     make \
@@ -16,9 +16,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Linux-native lockfile instead of resolving Windows prebuilt binaries
 COPY package.json ./
 
-# Install all production dependencies, compiling better-sqlite3 from source
-# against the container's own glibc (Debian Bookworm, glibc 2.36)
-RUN npm install --omit=dev
+# Install dependencies WITHOUT running any pre-install/install scripts
+# (this prevents npm from downloading the pre-built platform-specific binary).
+# Then rebuild sqlite3 from source against the container's own glibc.
+RUN npm ci --omit=dev --ignore-scripts \
+    && npm rebuild sqlite3 --build-from-source
 
 # ── Stage 2: Production Runtime ───────────────────────────────────────────────
 FROM node:20-bookworm-slim AS production
