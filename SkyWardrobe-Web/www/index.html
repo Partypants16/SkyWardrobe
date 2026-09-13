@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SkyWardrobe — Weather & Wardrobe</title>
   <meta name="description" content="SkyWardrobe translates real-time weather into practical outfit recommendations, rain forecasts, and radar maps." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%A6%EF%B8%8F%3C/text%3E%3C/svg%3E" />
 
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -673,6 +674,15 @@
       padding: 24px;
     }
 
+    /* These three are all shown/hidden via the `hidden` attribute in JS, but
+       each also unconditionally sets `display` on an ID selector — which,
+       being more specific than the UA default `[hidden] { display: none }`
+       rule, would otherwise defeat it and leave them stuck visible forever
+       regardless of what JS sets `.hidden` to. This restores real hiding. */
+    #radar-loading[hidden], #radar-error[hidden], #radar-controls[hidden] {
+      display: none;
+    }
+
     /* Radar controls */
     #radar-controls {
       display: flex;
@@ -1086,17 +1096,18 @@
   <script src="config.js" defer></script>
   <script src="services/rain-service.js" defer></script>
   <script src="services/wardrobe-rain.js" defer></script>
+  <script src="services/radar-frames.js" defer></script>
   <script src="components/next-rain.js" defer></script>
   <script src="components/rain-graph.js" defer></script>
   <script src="components/hourly.js" defer></script>
   <script src="components/insights.js" defer></script>
   <script src="components/outdoor-window.js" defer></script>
   <script src="components/radar.js" defer></script>
-  <script src="script.js?v=5" defer></script>
+  <script src="script.js?v=6" defer></script>
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN2GqJ4=" crossorigin=""></script>
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 </head>
 <body>
   <main class="dashboard" aria-live="polite">

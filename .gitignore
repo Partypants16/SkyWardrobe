@@ -16,3 +16,7 @@ ios/App/Pods/
 
 # Environment files
 .env
+
+# Stray git worktree checkouts (must never be committed - can contain .env/node_modules)
+SkyWardrobe.worktrees/
+*.worktrees/

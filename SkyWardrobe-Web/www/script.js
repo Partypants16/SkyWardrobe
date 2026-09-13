@@ -110,14 +110,14 @@ function formatMeasurementTime(ts, tzOffset = 0) {
 function formatDescription(v) { return v || "No condition available"; }
 
 // ── Config / API helpers ─────────────────────────────────────────────────────
-const OWM_WEATHER_URL  = "https://api.openweathermap.org/data/2.5/weather";
-const OWM_FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast";
-const OWM_GEO_URL      = "https://api.openweathermap.org/geo/1.0/direct";
+// The OpenWeatherMap key is a secret and lives only on the server (logic.js).
+// The browser never calls OpenWeatherMap directly — it always goes through
+// our own /weather, /forecast and /geocode proxy endpoints below.
 
 function getAppConfig() { return window.SKYWARDROBE_CONFIG || {}; }
 
-async function fetchJson(url) {
-  const resp = await fetch(url);
+async function fetchJson(url, signal) {
+  const resp = await fetch(url, signal ? { signal } : undefined);
   if (!resp.ok) throw new Error(`Request failed with status ${resp.status}`);
   const data = await resp.json();
   if (data.error) throw new Error(data.error);
@@ -128,22 +128,8 @@ async function fetchJson(url) {
 function buildServerUrl(path, params) {
   const config  = getAppConfig();
   const baseUrl = (config.API_BASE_URL || "").replace(/\/$/, "");
-  const isHttp  = window.location.protocol === "http:" || window.location.protocol === "https:";
-  const prefix  = baseUrl || (isHttp ? "" : null);
-  if (prefix === null) return null;
-  const url = new URL(path, window.location.origin);
-  if (baseUrl) url.href = `${baseUrl}${path}`;
+  const url = new URL(baseUrl ? `${baseUrl}${path}` : path, window.location.origin);
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  return url.toString();
-}
-
-function buildOWMUrl(endpoint, extraParams) {
-  const config = getAppConfig();
-  if (!config.OPENWEATHER_KEY) throw new Error("Missing OpenWeather API key.");
-  const url = new URL(endpoint);
-  url.searchParams.set("appid", config.OPENWEATHER_KEY);
-  url.searchParams.set("units", "metric");
-  if (extraParams) Object.entries(extraParams).forEach(([k, v]) => url.searchParams.set(k, v));
   return url.toString();
 }
 
@@ -158,85 +144,20 @@ function locationParams() {
 }
 
 // ── Fetch weather (current) ──────────────────────────────────────────────────
-async function fetchWeatherData() {
+async function fetchWeatherData(signal) {
   const params = locationParams();
-
-  // Try server proxy first
-  const serverUrl = buildServerUrl("/weather", params);
-  if (serverUrl) {
-    try { return await fetchJson(serverUrl); } catch (e) {
-      if (!getAppConfig().OPENWEATHER_KEY) throw e;
-    }
-  }
-
-  // Fall back to direct OWM call
-  return fetchJson(buildOWMUrl(OWM_WEATHER_URL, { ...params }));
+  return fetchJson(buildServerUrl("/weather", params), signal);
 }
 
 // ── Fetch forecast ───────────────────────────────────────────────────────────
-async function fetchForecastData() {
+async function fetchForecastData(signal) {
   const params = locationParams();
-
-  // Try server proxy first
-  const serverUrl = buildServerUrl("/forecast", params);
-  if (serverUrl) {
-    try { return await fetchJson(serverUrl); } catch (e) {
-      if (!getAppConfig().OPENWEATHER_KEY) throw e;
-    }
-  }
-
-  // Fall back to direct OWM call
-  const url = buildOWMUrl(OWM_FORECAST_URL, { ...params, cnt: 40 });
-  const raw = await fetchJson(url);
-  // Normalize direct OWM response to match server format
-  return normalizeForecastResponse(raw);
-}
-
-function normalizeForecastResponse(data) {
-  return {
-    city: {
-      name:     data.city?.name ?? null,
-      country:  data.city?.country ?? null,
-      coord:    { lat: data.city?.coord?.lat ?? null, lon: data.city?.coord?.lon ?? null },
-      timezone: data.city?.timezone ?? null,
-      sunrise:  data.city?.sunrise ?? null,
-      sunset:   data.city?.sunset ?? null
-    },
-    list: (data.list || []).map((item) => ({
-      dt:           item.dt,
-      dt_txt:       item.dt_txt,
-      temp:         item.main?.temp ?? null,
-      feels_like:   item.main?.feels_like ?? null,
-      temp_min:     item.main?.temp_min ?? null,
-      temp_max:     item.main?.temp_max ?? null,
-      humidity:     item.main?.humidity ?? null,
-      pressure:     item.main?.pressure ?? null,
-      weather_id:   item.weather?.[0]?.id ?? null,
-      weather_main: item.weather?.[0]?.main ?? null,
-      weather_desc: item.weather?.[0]?.description ?? null,
-      weather_icon: item.weather?.[0]?.icon ?? null,
-      wind_speed:   item.wind?.speed ?? null,
-      wind_deg:     item.wind?.deg ?? null,
-      wind_gust:    item.wind?.gust ?? null,
-      clouds:       item.clouds?.all ?? null,
-      pop:          item.pop ?? 0,
-      rain_3h:      item.rain?.["3h"] ?? 0,
-      snow_3h:      item.snow?.["3h"] ?? 0,
-      visibility:   item.visibility ?? null,
-      pod:          item.sys?.pod ?? null
-    }))
-  };
+  return fetchJson(buildServerUrl("/forecast", params), signal);
 }
 
 // ── Fetch geocode ────────────────────────────────────────────────────────────
-async function fetchGeocode(query) {
-  const serverUrl = buildServerUrl("/geocode", { q: query });
-  if (serverUrl) {
-    try { return await fetchJson(serverUrl); } catch (e) {
-      if (!getAppConfig().OPENWEATHER_KEY) throw e;
-    }
-  }
-  return fetchJson(buildOWMUrl(OWM_GEO_URL, { q: query, limit: 5 }));
+async function fetchGeocode(query, signal) {
+  return fetchJson(buildServerUrl("/geocode", { q: query }), signal);
 }
 
 // ── Data normalisation ───────────────────────────────────────────────────────
@@ -303,7 +224,8 @@ function normalizeWeatherData(data) {
     main:        textValue(data.main, cond.main),
     description: textValue(data.description, cond.description),
     icon:        textValue(data.icon, cond.icon),
-    outfit:      data.outfit || raw.outfit || null
+    outfit:      data.outfit || raw.outfit || null,
+    mock:        Boolean(data.mock || raw.mock)
   };
 }
 
@@ -455,7 +377,7 @@ function renderDashboard() {
     : "Last refreshed: --";
 
   // Update location state from weather coords
-  if (Number.isFinite(lat) && Number.isFinite(lon) && !dashboardState.location.lat) {
+  if (Number.isFinite(lat) && Number.isFinite(lon) && !Number.isFinite(dashboardState.location.lat)) {
     dashboardState.location.lat  = lat;
     dashboardState.location.lon  = lon;
     dashboardState.location.name = weather.name;
@@ -469,7 +391,7 @@ let _graphInitialized = false;
 function renderRainFeatures(forecast, currentWeather) {
   if (!forecast || !Array.isArray(forecast.list)) {
     window.NextRainComponent?.setError("next-rain-section", "Forecast unavailable.");
-    window.HourlyComponent?.setLoading("hourly-section");
+    window.HourlyComponent?.setError("hourly-section");
     return;
   }
 
@@ -529,20 +451,27 @@ function renderRainFeatures(forecast, currentWeather) {
   initRadarWhenVisible();
 }
 
+// Guards observer creation independently of _radarInitialized: renderRainFeatures()
+// runs on every refresh, but the section may not have scrolled into view yet, so
+// without this flag a fresh IntersectionObserver (and duplicate button listeners)
+// would be created on every single refresh until the user finally scrolls to it.
+let _radarObserverCreated = false;
+
 function initRadarWhenVisible() {
   const radarSection = document.getElementById("radar-section");
-  if (!radarSection || _radarInitialized) return;
+  if (!radarSection || _radarObserverCreated) return;
+  _radarObserverCreated = true;
 
   const obs = new IntersectionObserver((entries) => {
     for (const entry of entries) {
       if (entry.isIntersecting) {
-        const lat = dashboardState.location.lat ?? -37.814;
-        const lon = dashboardState.location.lon ?? 144.963;
+        const lat = Number.isFinite(dashboardState.location.lat) ? dashboardState.location.lat : -37.814;
+        const lon = Number.isFinite(dashboardState.location.lon) ? dashboardState.location.lon : 144.963;
         window.RadarComponent?.init("radar-map", lat, lon);
         _radarInitialized = true;
         obs.disconnect();
 
-        // Wire up radar controls
+        // Wire up radar controls (registered exactly once, guarded by _radarObserverCreated above)
         document.getElementById("radar-play-pause")?.addEventListener("click", () => {
           window.RadarComponent?.togglePlayPause();
         });
@@ -598,7 +527,20 @@ function renderError(message) {
 }
 
 // ── Refresh all ───────────────────────────────────────────────────────────────
+// A monotonically increasing request generation guards against races: if the
+// user switches location again before an in-flight request settles, the
+// stale request's abort controller is cancelled and its result — even if it
+// arrives late — is discarded rather than overwriting the newer location.
+let _requestGeneration = 0;
+let _activeAbort       = null;
+
 async function refreshAll() {
+  if (_activeAbort) _activeAbort.abort();
+  const abortController = new AbortController();
+  _activeAbort = abortController;
+  const myGeneration = ++_requestGeneration;
+  const isStale = () => myGeneration !== _requestGeneration;
+
   elements.refreshButton.disabled = true;
   elements.status.classList.remove("error");
   elements.status.textContent = "Refreshing weather data…";
@@ -609,29 +551,33 @@ async function refreshAll() {
 
   // Fetch current weather
   try {
-    const data = await fetchWeatherData();
+    const data = await fetchWeatherData(abortController.signal);
+    if (isStale()) return;
     saveWeatherData(data);
     renderDashboard();
     weatherOk      = true;
     currentWeather = dashboardState.weather;
   } catch (err) {
+    if (isStale() || err.name === "AbortError") return;
     renderError(err.message || "Weather fetch failed");
   }
 
   // Fetch forecast (independent — don't let it break current weather display)
   try {
-    const forecast = await fetchForecastData();
+    const forecast = await fetchForecastData(abortController.signal);
+    if (isStale()) return;
     saveForecastData(forecast);
     renderRainFeatures(forecast, currentWeather);
     forecastOk = true;
   } catch (err) {
+    if (isStale() || err.name === "AbortError") return;
     console.warn("Forecast fetch failed:", err.message);
     window.NextRainComponent?.setError("next-rain-section", "Forecast data temporarily unavailable.");
-    window.HourlyComponent?.setLoading("hourly-section");
+    window.HourlyComponent?.setError("hourly-section");
   }
 
   // Update radar location if it's already initialised
-  if (_radarInitialized && dashboardState.location.lat) {
+  if (_radarInitialized && Number.isFinite(dashboardState.location.lat)) {
     window.RadarComponent?.setLocation(dashboardState.location.lat, dashboardState.location.lon);
   }
 
@@ -640,12 +586,17 @@ async function refreshAll() {
     const expanded = hasExpandedWeatherFields(dashboardState.weather);
     const forecastNote = forecastOk ? "" : " (forecast unavailable)";
     elements.status.classList.remove("error");
-    elements.status.textContent = expanded
-      ? `Dashboard refreshed with the latest weather data.${forecastNote}`
-      : `Refresh worked, but the server is returning compact weather data.${forecastNote}`;
+    if (dashboardState.weather.mock) {
+      elements.status.classList.add("error");
+      elements.status.textContent = `Live weather is unavailable right now — showing placeholder fallback conditions, not real data.${forecastNote}`;
+    } else {
+      elements.status.textContent = expanded
+        ? `Dashboard refreshed with the latest weather data.${forecastNote}`
+        : `Refresh worked, but the server is returning compact weather data.${forecastNote}`;
+    }
   }
 
-  elements.refreshButton.disabled = false;
+  if (!isStale()) elements.refreshButton.disabled = false;
 }
 
 // ── Location search ───────────────────────────────────────────────────────────
@@ -720,9 +671,14 @@ function requestGPSLocation() {
     },
     (err) => {
       elements.gpsButton.textContent = "📍";
-      const msg = err.code === err.PERMISSION_DENIED
-        ? "Location access denied. Using default city instead."
-        : "Could not detect your location. Using default city.";
+      let msg = "Could not detect your location. Using default city.";
+      if (err.code === err.PERMISSION_DENIED) {
+        msg = "Location access denied. Search for a city instead.";
+      } else if (err.code === err.TIMEOUT) {
+        msg = "Location request timed out. Search for a city instead.";
+      } else if (err.code === err.POSITION_UNAVAILABLE) {
+        msg = "Your location is unavailable right now. Search for a city instead.";
+      }
       elements.status.textContent = msg;
     },
     { timeout: 10000, enableHighAccuracy: false }
@@ -734,16 +690,22 @@ elements.refreshButton?.addEventListener("click", refreshAll);
 
 elements.gpsButton?.addEventListener("click", requestGPSLocation);
 
+let _geocodeGeneration = 0;
+
 elements.citySearch?.addEventListener("input", (e) => {
   const q = e.target.value.trim();
   if (_geocodeTimer) clearTimeout(_geocodeTimer);
   if (q.length < 2) { hideSearchResults(); return; }
 
+  const myGeneration = ++_geocodeGeneration;
   _geocodeTimer = setTimeout(async () => {
     try {
       const results = await fetchGeocode(q);
+      // Discard results from a superseded (older) search query.
+      if (myGeneration !== _geocodeGeneration) return;
       showSearchResults(results);
     } catch (_) {
+      if (myGeneration !== _geocodeGeneration) return;
       hideSearchResults();
     }
   }, 400);
