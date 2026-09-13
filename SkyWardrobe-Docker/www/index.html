@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SkyWardrobe — Weather & Wardrobe</title>
+  <meta name="description" content="SkyWardrobe translates real-time weather into practical outfit recommendations, rain forecasts, and radar maps." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%A6%EF%B8%8F%3C/text%3E%3C/svg%3E" />
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+    /* ── Design tokens ─────────────────────────────────────────────────────── */
+    :root {
+      --blue: #246bb2;
+      --teal: #087f83;
+      --rose: #b64a5a;
+      --rain-blue: #3b82f6;
+      --rain-blue-mid: #2563eb;
+      --rain-blue-dark: #1e40af;
+    }
+
+    body {
+      --page:       #edf3f1;
+      --ink:        #17211f;
+      --muted:      #63706d;
+      --panel:      rgba(255, 255, 255, 0.45);
+      --panel-soft: rgba(255, 255, 255, 0.3);
+      --line:       rgba(216, 226, 223, 0.4);
+      --accent:     var(--teal);
+      --shadow:     0 8px 32px 0 rgba(31, 38, 135, 0.06);
+      --theme-bg:   linear-gradient(135deg, rgba(36, 107, 178, 0.12), transparent 34%),
+                    linear-gradient(225deg, rgba(8, 127, 131, 0.13), transparent 38%),
+                    var(--page);
+    }
+
+    body.theme-clear {
+      --page:        #fffbf0;
+      --ink:         #2b1f00;
+      --muted:       #735c2b;
+      --line:        rgba(250, 234, 195, 0.4);
+      --panel:       rgba(255, 253, 245, 0.55);
+      --panel-soft:  rgba(255, 253, 245, 0.4);
+      --accent:      #d88a00;
+      --shadow:      0 8px 32px 0 rgba(216, 138, 0, 0.05);
+      --theme-bg:    linear-gradient(135deg, rgba(254, 215, 102, 0.25), transparent 45%),
+                     linear-gradient(225deg, rgba(243, 114, 44, 0.15), transparent 45%),
+                     var(--page);
+    }
+
+    body.theme-clouds {
+      --page:        #f0f4f5;
+      --ink:         #202a30;
+      --muted:       #606f7a;
+      --line:        rgba(219, 228, 230, 0.4);
+      --panel:       rgba(255, 255, 255, 0.5);
+      --panel-soft:  rgba(240, 244, 245, 0.4);
+      --accent:      var(--teal);
+      --shadow:      0 8px 32px 0 rgba(8, 127, 131, 0.05);
+      --theme-bg:    linear-gradient(135deg, rgba(96, 111, 122, 0.15), transparent 45%),
+                     linear-gradient(225deg, rgba(8, 127, 131, 0.12), transparent 45%),
+                     var(--page);
+    }
+
+    body.theme-rain {
+      --page:        #ebf1f5;
+      --ink:         #172430;
+      --muted:       #4e5f6f;
+      --line:        rgba(207, 224, 238, 0.4);
+      --panel:       rgba(255, 255, 255, 0.5);
+      --panel-soft:  rgba(244, 248, 250, 0.45);
+      --accent:      var(--blue);
+      --shadow:      0 8px 32px 0 rgba(36, 107, 178, 0.05);
+      --theme-bg:    linear-gradient(135deg, rgba(36, 107, 178, 0.2), transparent 45%),
+                     linear-gradient(225deg, rgba(78, 95, 111, 0.15), transparent 45%),
+                     var(--page);
+    }
+
+    body.theme-snow {
+      --page:        #f3f8fb;
+      --ink:         #1b262c;
+      --muted:       #536f7d;
+      --line:        rgba(223, 235, 242, 0.4);
+      --panel:       rgba(255, 255, 255, 0.65);
+      --panel-soft:  rgba(248, 251, 253, 0.55);
+      --accent:      #4895ef;
+      --shadow:      0 8px 32px 0 rgba(72, 149, 239, 0.06);
+      --theme-bg:    linear-gradient(135deg, rgba(72, 149, 239, 0.15), transparent 45%),
+                     linear-gradient(225deg, rgba(200, 220, 240, 0.25), transparent 45%),
+                     var(--page);
+    }
+
+    body.theme-night {
+      --page:        #0b0f19;
+      --ink:         #f8fafc;
+      --muted:       #94a3b8;
+      --panel:       rgba(30, 41, 59, 0.5);
+      --panel-soft:  rgba(15, 23, 42, 0.45);
+      --line:        rgba(51, 65, 85, 0.45);
+      --blue:        #38bdf8;
+      --teal:        #2dd4bf;
+      --accent:      #a855f7;
+      --shadow:      0 8px 32px 0 rgba(0, 0, 0, 0.25);
+      --theme-bg:    linear-gradient(135deg, rgba(168, 85, 247, 0.15), transparent 45%),
+                     linear-gradient(225deg, rgba(15, 23, 42, 0.5), transparent 45%),
+                     var(--page);
+    }
+
+    /* ── Reset ─────────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--theme-bg);
+      color: var(--ink);
+      transition: background 0.8s ease, color 0.5s ease;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────────────────── */
+    .dashboard {
+      width: min(1180px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 28px 0;
+    }
+
+    /* ── Topbar ─────────────────────────────────────────────────────────────── */
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .topbar-left { flex: 1 1 auto; min-width: 0; }
+
+    h1 {
+      margin: 0 0 7px;
+      font-size: 3.1rem;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      font-weight: 800;
+    }
+
+    .subtitle, .status, .meta, .detail {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+      transition: color 0.5s ease;
+    }
+
+    /* ── Location controls ──────────────────────────────────────────────────── */
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+
+    .location-search-wrap {
+      position: relative;
+    }
+
+    .location-input-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    #citySearch {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      color: var(--ink);
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 500;
+      min-height: 44px;
+      padding: 0 14px;
+      width: 200px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      backdrop-filter: blur(8px);
+    }
+
+    #citySearch::placeholder { color: var(--muted); }
+
+    #citySearch:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+    }
+
+    #gpsButton {
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      color: var(--ink);
+      cursor: pointer;
+      font-size: 1.1rem;
+      min-height: 44px;
+      padding: 0 12px;
+      transition: all 0.2s;
+      backdrop-filter: blur(8px);
+    }
+
+    #gpsButton:hover { background: var(--panel); border-color: var(--accent); }
+    #gpsButton.gps-active { color: var(--accent); border-color: var(--accent); }
+
+    .search-results {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      z-index: 9999;
+    }
+
+    .search-result-item {
+      cursor: pointer;
+      padding: 12px 14px;
+      font-size: 0.92rem;
+      border-bottom: 1px solid var(--line);
+      transition: background 0.15s;
+    }
+
+    .search-result-item:last-child { border-bottom: none; }
+    .search-result-item:hover { background: var(--panel-soft); }
+
+    .search-result-country {
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin-left: 6px;
+    }
+
+    /* ── Buttons ────────────────────────────────────────────────────────────── */
+    .refresh-button {
+      border: 0;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      min-height: 44px;
+      padding: 0 20px;
+      white-space: nowrap;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .refresh-button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      filter: brightness(1.1);
+    }
+
+    .theme-night .refresh-button:hover:not(:disabled) {
+      box-shadow: 0 4px 15px rgba(168, 85, 247, 0.35);
+    }
+
+    .refresh-button:active:not(:disabled) { transform: translateY(0); }
+    .refresh-button:disabled { cursor: wait; opacity: 0.6; }
+
+    /* ── Shared panel / card styles ─────────────────────────────────────────── */
+    .current-weather, .wardrobe-panel,
+    .weather-card, .data-panel, .rain-section {
+      background: var(--panel);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                  box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                  border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                  background 0.5s ease;
+    }
+
+    /* ── Hero grid ──────────────────────────────────────────────────────────── */
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .current-weather {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 22px;
+      min-height: 300px;
+      padding: 28px;
+    }
+
+    .weather-icon {
+      width: 120px;
+      height: 120px;
+      border-radius: 12px;
+      background: var(--panel-soft);
+      animation: floatIcon 4s ease-in-out infinite;
+      transition: background 0.5s ease;
+    }
+
+    @keyframes floatIcon {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-6px); }
+    }
+
+    .temperature {
+      margin: 0;
+      font-size: 7rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 0.9;
+    }
+
+    .description {
+      margin: 10px 0 6px;
+      color: var(--ink);
+      font-size: 1.45rem;
+      font-weight: 700;
+      text-transform: capitalize;
+    }
+
+    .mini-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-soft);
+      color: var(--muted);
+      font-size: 0.95rem;
+      padding: 8px 10px;
+      transition: background 0.5s ease, border-color 0.5s ease, color 0.5s ease;
+    }
+
+    /* ── Wardrobe panel ─────────────────────────────────────────────────────── */
+    .wardrobe-panel {
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+      gap: 0;
+    }
+
+    .panel-label, .card-label {
+      display: block;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      transition: color 0.5s ease;
+    }
+
+    .outfit-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .outfit-item {
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: var(--panel-soft);
+      border-left: 4px solid var(--accent);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.5s ease;
+    }
+
+    .outfit-item:hover {
+      transform: scale(1.02);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+    }
+
+    .outfit-category {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+
+    .outfit-name {
+      margin: 3px 0 2px;
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .outfit-desc {
+      margin: 0;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.3;
+    }
+
+    /* Rain wardrobe note */
+    .rain-wardrobe-note {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, rgba(59,130,246,0.12), rgba(37,99,235,0.08));
+      border: 1px solid rgba(59,130,246,0.25);
+      font-size: 0.87rem;
+      line-height: 1.5;
+      color: var(--ink);
+    }
+
+    .rain-wardrobe-note-header {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--rain-blue);
+      margin-bottom: 4px;
+    }
+
+    .rain-accessories {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .rain-accessory-chip {
+      background: rgba(59,130,246,0.15);
+      border: 1px solid rgba(59,130,246,0.3);
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      color: var(--ink);
+    }
+
+    /* ── Weather grid ───────────────────────────────────────────────────────── */
+    .weather-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .weather-card {
+      min-height: 132px;
+      padding: 18px;
+    }
+
+    .weather-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+      border-color: var(--accent);
+    }
+
+    .theme-night .weather-card:hover {
+      box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+    }
+
+    .weather-card.feature {
+      background: rgba(255,255,255,0.55);
+      border-color: var(--accent);
+    }
+
+    .theme-night .weather-card.feature {
+      background: rgba(30,41,59,0.6);
+    }
+
+    .metric {
+      margin: 0;
+      font-size: 1.85rem;
+      font-weight: 800;
+      line-height: 1.1;
+      overflow-wrap: anywhere;
+    }
+
+    .detail {
+      margin-top: 8px;
+      font-size: 0.94rem;
+    }
+
+    /* ── Section shared styles ──────────────────────────────────────────────── */
+    .rain-section {
+      margin-top: 18px;
+      padding: 22px 24px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .section-icon {
+      font-size: 1.3rem;
+      line-height: 1;
+    }
+
+    .section-title {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .section-subtitle {
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin-left: auto;
+    }
+
+    .muted-text { color: var(--muted); font-size: 0.95rem; }
+    .error-text { color: var(--rose); font-size: 0.95rem; }
+
+    /* ── Next Rain section ──────────────────────────────────────────────────── */
+    .rain-summary-text {
+      font-size: 1.18rem;
+      font-weight: 700;
+      margin: 0 0 16px;
+      line-height: 1.4;
+    }
+
+    .rain-period-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .rain-period-card {
+      border-radius: 12px;
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      padding: 14px 16px;
+      transition: transform 0.2s;
+    }
+
+    .rain-period-card:hover { transform: translateX(3px); }
+
+    .rain-period-card--primary {
+      border-left: 4px solid var(--rain-blue);
+      background: linear-gradient(135deg, rgba(59,130,246,0.08), transparent);
+    }
+
+    .rain-period-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .rain-period-time {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .rain-period-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .rain-period-badge {
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 3px 10px;
+    }
+
+    .intensity-none     { background: rgba(148,163,184,0.2); color: var(--muted); }
+    .intensity-light    { background: rgba(147,197,253,0.3); color: #1e40af; }
+    .intensity-moderate { background: rgba(59,130,246,0.25); color: #1d4ed8; }
+    .intensity-heavy    { background: rgba(239,68,68,0.2);   color: #b91c1c; }
+    .intensity-severe   { background: rgba(127,29,29,0.25);  color: #7f1d1d; }
+
+    .theme-night .intensity-light    { color: #93c5fd; }
+    .theme-night .intensity-moderate { color: #60a5fa; }
+    .theme-night .intensity-heavy    { color: #fca5a5; }
+    .theme-night .intensity-severe   { color: #f87171; }
+
+    .rain-period-stat {
+      font-size: 0.82rem;
+      color: var(--muted);
+      padding: 3px 8px;
+      background: var(--panel-soft);
+      border-radius: 6px;
+    }
+
+    .rain-no-rain {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .rain-no-rain-icon { font-size: 1.5rem; }
+
+    /* ── Radar section ──────────────────────────────────────────────────────── */
+    .radar-map-wrap {
+      position: relative;
+      border-radius: 12px;
+      overflow: hidden;
+      height: 420px;
+      background: var(--panel-soft);
+    }
+
+    #radar-map {
+      width: 100%;
+      height: 100%;
+    }
+
+    #radar-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--panel);
+      backdrop-filter: blur(8px);
+      gap: 10px;
+      z-index: 1000;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+
+    .radar-spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid var(--line);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #radar-error {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--panel);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      font-size: 0.95rem;
+      color: var(--muted);
+      text-align: center;
+      padding: 24px;
+    }
+
+    /* These three are all shown/hidden via the `hidden` attribute in JS, but
+       each also unconditionally sets `display` on an ID selector — which,
+       being more specific than the UA default `[hidden] { display: none }`
+       rule, would otherwise defeat it and leave them stuck visible forever
+       regardless of what JS sets `.hidden` to. This restores real hiding. */
+    #radar-loading[hidden], #radar-error[hidden], #radar-controls[hidden] {
+      display: none;
+    }
+
+    /* Radar controls */
+    #radar-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+
+    .radar-btn {
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      color: var(--ink);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.88rem;
+      font-weight: 600;
+      padding: 8px 14px;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .radar-btn:hover { background: var(--panel); border-color: var(--accent); }
+
+    .radar-timeline-wrap {
+      flex: 1 1 200px;
+      min-width: 120px;
+    }
+
+    .radar-timeline-track {
+      position: relative;
+      height: 8px;
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      cursor: pointer;
+      margin-bottom: 6px;
+    }
+
+    .radar-timeline-progress {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      background: var(--accent);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+      pointer-events: none;
+    }
+
+    .radar-timeline-handle {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 14px;
+      height: 14px;
+      background: var(--accent);
+      border: 2px solid #fff;
+      border-radius: 50%;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+      pointer-events: none;
+      transition: left 0.3s ease;
+    }
+
+    .radar-time-labels {
+      position: relative;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+      color: var(--muted);
+      height: 16px;
+    }
+
+    .radar-tl-now {
+      position: absolute;
+      transform: translateX(-50%);
+      font-weight: 700;
+      color: var(--accent);
+      font-size: 0.72rem;
+    }
+
+    .radar-tl-label { flex-shrink: 0; }
+    .radar-tl-label--right { margin-left: auto; }
+
+    #radar-current-time {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      min-width: 80px;
+      text-align: right;
+    }
+
+    /* Radar legend */
+    .radar-legend {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+    .radar-legend-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    .radar-legend-scale {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .radar-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .radar-legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    /* Leaflet overrides to fit our theme */
+    .leaflet-control-zoom {
+      border: 1px solid var(--line) !important;
+      border-radius: 10px !important;
+      overflow: hidden;
+    }
+
+    .leaflet-control-zoom a {
+      background: var(--panel) !important;
+      color: var(--ink) !important;
+      border-bottom: 1px solid var(--line) !important;
+    }
+
+    .leaflet-control-zoom a:hover { background: var(--panel-soft) !important; }
+    .leaflet-control-attribution { font-size: 0.65rem !important; }
+
+    /* ── Rain graph section ──────────────────────────────────────────────────── */
+    .rain-graph-wrap {
+      width: 100%;
+      height: 200px;
+      position: relative;
+    }
+
+    #rain-graph-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── Hourly timeline section ────────────────────────────────────────────── */
+    .hourly-scroll {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: thin;
+      scrollbar-color: var(--line) transparent;
+    }
+
+    .hourly-scroll::-webkit-scrollbar { height: 5px; }
+    .hourly-scroll::-webkit-scrollbar-track { background: transparent; }
+    .hourly-scroll::-webkit-scrollbar-thumb {
+      background: var(--line);
+      border-radius: 3px;
+    }
+
+    .hourly-card {
+      flex: 0 0 auto;
+      min-width: 106px;
+      scroll-snap-align: start;
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 10px;
+      text-align: center;
+      font-size: 0.83rem;
+      transition: transform 0.2s, border-color 0.2s;
+      cursor: default;
+    }
+
+    .hourly-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+
+    .hourly-card--current {
+      border-color: var(--accent);
+      background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 10%, var(--panel-soft)), var(--panel-soft));
+    }
+
+    .hourly-card--rainy {
+      border-color: rgba(59,130,246,0.5);
+    }
+
+    .hourly-time { font-size: 0.75rem; font-weight: 700; color: var(--muted); }
+    .hourly-icon { font-size: 1.6rem; margin: 4px 0; line-height: 1; }
+    .hourly-temp { font-size: 1.2rem; font-weight: 800; }
+    .hourly-feels { font-size: 0.72rem; color: var(--muted); margin-bottom: 6px; }
+    .hourly-pop   { font-size: 0.8rem; font-weight: 700; margin: 3px 0; }
+    .hourly-pop.pop-high   { color: #2563eb; }
+    .hourly-pop.pop-medium { color: #3b82f6; }
+    .hourly-pop.pop-low    { color: #93c5fd; }
+    .pop-dry { color: var(--muted); font-weight: 400; }
+    .hourly-mm   { font-size: 0.74rem; color: #3b82f6; }
+    .hourly-wind { font-size: 0.74rem; color: var(--muted); margin-top: 4px; }
+
+    /* ── Insights + Outdoor window — side by side on desktop ───────────────── */
+    .insights-outdoor-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .insight-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .insight-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 0.92rem;
+      line-height: 1.45;
+      padding: 10px 12px;
+      background: var(--panel-soft);
+      border-radius: 9px;
+      border: 1px solid var(--line);
+    }
+
+    .insight-item::before {
+      content: "•";
+      color: var(--accent);
+      font-weight: 900;
+      font-size: 1rem;
+      line-height: 1.45;
+      flex-shrink: 0;
+    }
+
+    .outdoor-card {
+      padding: 14px;
+      background: linear-gradient(135deg, rgba(34,197,94,0.1), rgba(16,185,129,0.06));
+      border: 1px solid rgba(34,197,94,0.25);
+      border-radius: 12px;
+    }
+
+    .outdoor-time {
+      font-size: 1.15rem;
+      font-weight: 800;
+      margin-bottom: 2px;
+    }
+
+    .outdoor-dur {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .outdoor-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .outdoor-chip {
+      background: rgba(255,255,255,0.55);
+      border: 1px solid rgba(34,197,94,0.2);
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 4px 10px;
+    }
+
+    .theme-night .outdoor-chip { background: rgba(255,255,255,0.08); }
+
+    .outdoor-no-window {
+      padding: 10px 0;
+    }
+
+    /* ── Data panel (existing) ──────────────────────────────────────────────── */
+    .data-panel {
+      margin-top: 18px;
+      padding: 20px;
+    }
+
+    .data-title {
+      margin: 0 0 14px;
+      font-size: 1.2rem;
+    }
+
+    .data-list {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin: 0;
+    }
+
+    .data-item {
+      border-radius: 8px;
+      background: var(--panel-soft);
+      padding: 14px;
+    }
+
+    .data-item dt {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      margin-bottom: 7px;
+      text-transform: uppercase;
+    }
+
+    .data-item dd {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 700;
+      overflow-wrap: anywhere;
+    }
+
+    /* ── Footer row ─────────────────────────────────────────────────────────── */
+    .footer-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .error { color: var(--rose); font-weight: 700; }
+
+    /* ── Responsive ─────────────────────────────────────────────────────────── */
+    @media (max-width: 980px) {
+      .hero-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .weather-grid, .data-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .insights-outdoor-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .radar-map-wrap { height: 300px; }
+    }
+
+    @media (max-width: 620px) {
+      .dashboard {
+        width: min(100% - 20px, 1180px);
+        padding: 18px 0;
+      }
+
+      .topbar, .footer-row, .current-weather {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .topbar-right { flex-direction: column; align-items: stretch; }
+
+      .location-input-row { width: 100%; }
+
+      #citySearch { width: 100%; flex: 1; }
+
+      .current-weather {
+        display: flex;
+        gap: 8px;
+        min-height: 0;
+        padding: 20px;
+      }
+
+      h1 { font-size: 2.25rem; }
+      .temperature { font-size: 4.2rem; }
+      .description { font-size: 1.22rem; }
+
+      .weather-grid, .data-list {
+        grid-template-columns: 1fr;
+      }
+
+      .weather-icon { width: 88px; height: 88px; }
+
+      .refresh-button { width: 100%; }
+
+      .radar-map-wrap { height: 240px; }
+
+      #radar-controls { gap: 8px; }
+
+      .rain-graph-wrap { height: 160px; }
+
+      .section-subtitle { display: none; }
+    }
+  </style>
+
+  <!-- Scripts (order matters — dependencies first) -->
+  <script src="config.js" defer></script>
+  <script src="services/rain-service.js" defer></script>
+  <script src="services/wardrobe-rain.js" defer></script>
+  <script src="services/radar-frames.js" defer></script>
+  <script src="components/next-rain.js" defer></script>
+  <script src="components/rain-graph.js" defer></script>
+  <script src="components/hourly.js" defer></script>
+  <script src="components/insights.js" defer></script>
+  <script src="components/outdoor-window.js" defer></script>
+  <script src="components/radar.js" defer></script>
+  <script src="script.js?v=6" defer></script>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+</head>
+<body>
+  <main class="dashboard" aria-live="polite">
+
+    <!-- ══ Topbar ═════════════════════════════════════════════════════════════ -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <h1>SkyWardrobe</h1>
+        <p class="subtitle" id="location">Weather translated into what to wear now.</p>
+      </div>
+      <div class="topbar-right">
+        <div class="location-search-wrap">
+          <div class="location-input-row">
+            <input
+              type="text"
+              id="citySearch"
+              placeholder="Search city…"
+              autocomplete="off"
+              aria-label="Search for a city"
+            />
+            <button id="gpsButton" type="button" title="Use my GPS location" aria-label="Use GPS location">📍</button>
+          </div>
+          <div id="citySearchResults" class="search-results" hidden></div>
+        </div>
+        <button class="refresh-button" id="refreshButton" type="button">Refresh</button>
+      </div>
+    </div>
+
+    <!-- ══ Hero grid — current weather + wardrobe ════════════════════════════ -->
+    <section class="hero-grid" aria-label="Current weather and clothing guidance">
+      <div class="current-weather">
+        <img class="weather-icon" id="weatherIcon" alt="" hidden />
+        <div>
+          <p class="temperature" id="temperature">--</p>
+          <p class="description" id="description">Waiting for weather</p>
+          <p class="meta" id="feelsLike">Feels like --</p>
+          <div class="mini-row" aria-label="Temperature range and update details">
+            <span class="chip" id="tempRange">Range --</span>
+            <span class="chip" id="condition">Condition --</span>
+            <span class="chip" id="updatedAt">Measured --</span>
+          </div>
+        </div>
+      </div>
+
+      <aside class="wardrobe-panel">
+        <div>
+          <span class="panel-label">Outfit of the Day</span>
+          <div class="outfit-container">
+            <div class="outfit-item">
+              <span class="outfit-category">Top</span>
+              <p class="outfit-name" id="outfitTop">Checking database…</p>
+              <p class="outfit-desc" id="outfitTopDesc"></p>
+            </div>
+            <div class="outfit-item">
+              <span class="outfit-category">Bottom</span>
+              <p class="outfit-name" id="outfitBottom">Checking database…</p>
+              <p class="outfit-desc" id="outfitBottomDesc"></p>
+            </div>
+            <div class="outfit-item">
+              <span class="outfit-category">Outerwear</span>
+              <p class="outfit-name" id="outfitOuterwear">Checking database…</p>
+              <p class="outfit-desc" id="outfitOuterwearDesc"></p>
+            </div>
+            <div class="outfit-item">
+              <span class="outfit-category">Footwear</span>
+              <p class="outfit-name" id="outfitFootwear">Checking database…</p>
+              <p class="outfit-desc" id="outfitFootwearDesc"></p>
+            </div>
+            <div class="outfit-item">
+              <span class="outfit-category">Accessory</span>
+              <p class="outfit-name" id="outfitAccessory">Checking database…</p>
+              <p class="outfit-desc" id="outfitAccessoryDesc"></p>
+            </div>
+          </div>
+
+          <!-- Rain wardrobe note (populated by JS) -->
+          <div id="rain-wardrobe-note" class="rain-wardrobe-note" hidden>
+            <div class="rain-wardrobe-note-header">🌧 Rain Advisory</div>
+            <p id="rain-wardrobe-text" style="margin:0"></p>
+            <div id="rain-accessories" class="rain-accessories"></div>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <!-- ══ Weather metric cards ══════════════════════════════════════════════ -->
+    <section class="weather-grid" aria-label="Weather measurements">
+      <article class="weather-card feature">
+        <span class="card-label">Humidity</span>
+        <p class="metric" id="humidity">--</p>
+        <p class="detail">How sticky the air feels.</p>
+      </article>
+      <article class="weather-card feature">
+        <span class="card-label">Wind</span>
+        <p class="metric" id="windSpeed">--</p>
+        <p class="detail" id="windDirection">Direction --</p>
+      </article>
+      <article class="weather-card">
+        <span class="card-label">Gusts</span>
+        <p class="metric" id="windGust">--</p>
+        <p class="detail">Sudden stronger wind bursts.</p>
+      </article>
+      <article class="weather-card">
+        <span class="card-label">Cloud cover</span>
+        <p class="metric" id="clouds">--</p>
+        <p class="detail">Percentage of sky covered.</p>
+      </article>
+      <article class="weather-card">
+        <span class="card-label">Pressure</span>
+        <p class="metric" id="pressure">--</p>
+        <p class="detail" id="pressureLevels">Sea / ground --</p>
+      </article>
+      <article class="weather-card">
+        <span class="card-label">Visibility</span>
+        <p class="metric" id="visibility">--</p>
+        <p class="detail">Maximum current visibility.</p>
+      </article>
+      <article class="weather-card">
+        <span class="card-label">Rain</span>
+        <p class="metric" id="rain">--</p>
+        <p class="detail">Recent measured rainfall.</p>
+      </article>
+      <article class="weather-card">
+        <span class="card-label">Snow</span>
+        <p class="metric" id="snow">--</p>
+        <p class="detail">Recent measured snowfall.</p>
+      </article>
+    </section>
+
+    <!-- ══ NEW: When Will It Rain? ═══════════════════════════════════════════ -->
+    <section class="rain-section" id="next-rain-section" aria-label="Upcoming rain forecast">
+      <p class="muted-text">Loading rain forecast…</p>
+    </section>
+
+    <!-- ══ NEW: Interactive Radar ════════════════════════════════════════════ -->
+    <section class="rain-section" id="radar-section" aria-label="Weather radar">
+      <div class="section-header">
+        <span class="section-icon">📡</span>
+        <h2 class="section-title">Live Precipitation Radar</h2>
+        <span class="section-subtitle">Powered by RainViewer · OpenStreetMap</span>
+      </div>
+
+      <div class="radar-map-wrap">
+        <div id="radar-map"></div>
+        <div id="radar-loading">
+          <div class="radar-spinner"></div>
+          <span>Loading radar…</span>
+        </div>
+        <div id="radar-error" hidden>
+          <span>Radar data is currently unavailable.<br>
+          Hourly forecast below is still accurate.</span>
+        </div>
+      </div>
+
+      <!-- Controls (hidden until frames load) -->
+      <div id="radar-controls" hidden>
+        <button class="radar-btn" id="radar-play-pause" type="button">⏸ Pause</button>
+        <div class="radar-timeline-wrap">
+          <div class="radar-timeline-track" id="radar-timeline-track" role="slider" aria-label="Radar animation timeline">
+            <div class="radar-timeline-progress" id="radar-timeline-progress"></div>
+            <div class="radar-timeline-handle" id="radar-timeline-handle"></div>
+          </div>
+          <div class="radar-time-labels">
+            <div id="radar-time-labels-inner" style="position:relative;display:flex;justify-content:space-between;width:100%;">
+              <span class="radar-tl-label">Past</span>
+              <span class="radar-tl-label radar-tl-label--right">Forecast</span>
+            </div>
+          </div>
+        </div>
+        <span id="radar-current-time" aria-live="polite">--</span>
+        <button class="radar-btn" id="radar-recentre-btn" type="button" title="Re-centre map">📍 Re-centre</button>
+      </div>
+
+      <!-- Legend -->
+      <div class="radar-legend">
+        <span class="radar-legend-label">Intensity</span>
+        <div class="radar-legend-scale">
+          <span class="radar-legend-item">
+            <span class="radar-legend-dot" style="background:rgba(0,235,235,0.85)"></span>Light
+          </span>
+          <span class="radar-legend-item">
+            <span class="radar-legend-dot" style="background:rgba(0,144,0,0.85)"></span>Moderate
+          </span>
+          <span class="radar-legend-item">
+            <span class="radar-legend-dot" style="background:rgba(255,165,0,0.85)"></span>Heavy
+          </span>
+          <span class="radar-legend-item">
+            <span class="radar-legend-dot" style="background:rgba(220,20,20,0.85)"></span>Severe
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ NEW: Rain Probability Graph ═══════════════════════════════════════ -->
+    <section class="rain-section" id="rain-graph-section" aria-label="Rain probability chart">
+      <div class="section-header">
+        <span class="section-icon">📊</span>
+        <h2 class="section-title">Precipitation Forecast</h2>
+        <span class="section-subtitle">Next 24 hours</span>
+      </div>
+      <div class="rain-graph-wrap">
+        <canvas id="rain-graph-canvas" aria-label="Precipitation probability chart"></canvas>
+      </div>
+    </section>
+
+    <!-- ══ NEW: Hourly Forecast ═══════════════════════════════════════════════ -->
+    <section class="rain-section" id="hourly-section" aria-label="Hourly weather forecast">
+      <p class="muted-text">Loading hourly data…</p>
+    </section>
+
+    <!-- ══ NEW: Insights + Outdoor Window ════════════════════════════════════ -->
+    <div class="insights-outdoor-grid">
+      <section class="rain-section" id="insights-section" aria-label="Weather insights" hidden>
+        <!-- populated by InsightsComponent -->
+      </section>
+      <section class="rain-section" id="outdoor-window-section" aria-label="Outdoor activity window">
+        <!-- populated by OutdoorWindowComponent -->
+      </section>
+    </div>
+
+    <!-- ══ Location + sun details ════════════════════════════════════════════ -->
+    <section class="data-panel" aria-label="Location and sun details">
+      <h2 class="data-title">Location and sun details</h2>
+      <dl class="data-list">
+        <div class="data-item"><dt>Coordinates</dt><dd id="coordinates">--</dd></div>
+        <div class="data-item"><dt>Country</dt>    <dd id="country">--</dd></div>
+        <div class="data-item"><dt>Sunrise</dt>    <dd id="sunrise">--</dd></div>
+        <div class="data-item"><dt>Sunset</dt>     <dd id="sunset">--</dd></div>
+        <div class="data-item"><dt>Timezone</dt>   <dd id="timezone">--</dd></div>
+        <div class="data-item"><dt>City ID</dt>    <dd id="cityId">--</dd></div>
+        <div class="data-item"><dt>Station type</dt><dd id="stationType">--</dd></div>
+        <div class="data-item"><dt>Base</dt>        <dd id="base">--</dd></div>
+      </dl>
+    </section>
+
+    <div class="footer-row">
+      <p class="status" id="status">Loading weather data…</p>
+      <p class="meta" id="lastUpdated">Last refreshed: --</p>
+    </div>
+
+  </main>
+</body>
+</html>
